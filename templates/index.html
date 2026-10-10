@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
   <script src="/static/games.js" defer></script>
+  <script src="/static/teams.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -43,6 +44,7 @@
       <div class="section-tabs" role="tablist" aria-label="Party tools">
         <button id="players-tab" role="tab" aria-selected="true" aria-controls="players-panel">Players</button>
         <button id="games-tab" role="tab" aria-selected="false" aria-controls="games-panel" tabindex="-1">Games <span id="game-count">0</span></button>
+        <button id="teams-tab" role="tab" aria-selected="false" aria-controls="teams-panel" tabindex="-1">Teams</button>
       </div>
         <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
       <section class="directory" id="players-panel" role="tabpanel" aria-labelledby="players-tab">
@@ -66,6 +68,32 @@
           <tbody id="games"></tbody>
         </table></div>
         <div class="empty-state" id="games-empty"><h3>No games yet.</h3><p>The organizer can add games to get things started.</p></div>
+      </section>
+      <section id="teams-panel" role="tabpanel" aria-labelledby="teams-tab" hidden>
+        <div class="directory-heading"><div class="section-title"><span class="section-marker">03</span><h2>Mix up the teams.</h2></div></div>
+        <p class="games-intro">Pick players. Choose a split. Shuffle and play.</p>
+        <div class="teams-workspace">
+          <div class="team-picker">
+            <div class="team-picker-heading"><h3>Players <span id="team-selected-count">0 selected</span></h3><div><button class="text-button" id="team-select-all">Select all</button><button class="text-button" id="team-clear">Clear</button></div></div>
+            <label class="search"><span aria-hidden="true">⌕</span><input type="search" id="team-search" aria-label="Search team players" placeholder="Find a player…" autocomplete="off"></label>
+            <div id="team-player-picker" class="team-player-picker"></div>
+            <p id="team-picker-empty" class="games-intro">Players appear here after joining the party.</p>
+          </div>
+          <div class="team-settings">
+            <form id="team-form">
+              <label>Split by<select id="team-mode"><option value="team_count">Number of teams</option><option value="team_size">Maximum players per team</option></select></label>
+              <label><span id="team-amount-label">Number of teams</span><input id="team-amount" aria-labelledby="team-amount-label" type="number" min="1" max="100" step="1" value="2" required></label>
+              <p id="team-plan" class="team-plan" aria-live="polite">Select at least two players.</p>
+              <p class="form-error" id="team-error" role="alert" hidden></p>
+              <button type="submit" class="button primary full" id="shuffle-teams" disabled>Shuffle teams ↗</button>
+              <p class="form-help">Everyone selected plays. Team sizes differ by at most one. Draws aren’t saved; copy to share.</p>
+            </form>
+          </div>
+        </div>
+        <section id="team-results" class="team-results" aria-labelledby="team-result-title" hidden>
+          <div class="team-result-heading"><h3 id="team-result-title">Your teams</h3><button class="button small" id="copy-teams">Copy teams ⧉</button></div>
+          <p class="games-intro" id="team-result-summary" role="status"></p><div id="team-result-grid" class="team-result-grid"></div>
+        </section>
       </section>
       <aside class="steam-help"><span class="help-symbol" aria-hidden="true">i</span><p><strong>Adding a friend?</strong> Copy their code, open Steam → Friends → Add a Friend, and paste it there. Find your own code on that same page.</p></aside>
     </main>
@@ -130,7 +158,7 @@
     <p class="form-error" id="password-error" role="alert" hidden></p><button class="button primary full" type="submit">Save password ↗</button>
   </form></dialog>
 
-  <dialog id="copy-dialog" aria-labelledby="copy-title"><div class="dialog-heading"><span class="eyebrow">COPY & GO</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="copy-title">Ready to copy.</h2><p class="dialog-intro">Your browser needs a manual copy. Hold the selected text, or press Ctrl/Cmd+C.</p><input id="manual-copy" aria-label="Text to copy" readonly><button class="button full close-dialog" type="button">Done</button></dialog>
+  <dialog id="copy-dialog" aria-labelledby="copy-title"><div class="dialog-heading"><span class="eyebrow">COPY & GO</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="copy-title">Ready to copy.</h2><p class="dialog-intro">Your browser needs a manual copy. Hold the selected text, or press Ctrl/Cmd+C.</p><textarea id="manual-copy" aria-label="Text to copy" rows="2" readonly></textarea><button class="button full close-dialog" type="button">Done</button></dialog>
 
   <dialog id="remove-dialog" aria-labelledby="remove-title"><form id="remove-form"><div class="dialog-heading"><span class="eyebrow">PLAYER DETAILS</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="remove-title">Remove this player?</h2><p class="dialog-intro" id="remove-description"></p><p class="form-error" id="remove-error" role="alert" hidden></p><button type="submit" class="button destructive full">Remove player</button></form></dialog>
   <div id="toast" class="toast" role="status" hidden></div>

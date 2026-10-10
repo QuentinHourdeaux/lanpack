@@ -12,6 +12,7 @@ Bring a laptop, start LANpack, share the QR. Everyone gets a browser-based playe
 - Copy friend codes, with a manual-copy fallback on browsers that restrict the clipboard over HTTP.
 - QR code and join address generated locally; no CDNs, analytics or external runtime assets.
 - First-run organizer setup, password changes, corrections, removals and JSON export.
+- Random teams: select players, choose team count or maximum team size, shuffle balanced teams and copy the result.
 - SQLite persistence, a Docker container and a small launcher for start/stop/backup.
 
 Steam requests happen in Steam. LANpack does not log into Steam, collect Steam credentials, verify account ownership or send friend requests. We deliberately do not derive Steam profile links from codes: that behavior has not been verified against real accounts. Numeric input is bounded to 1–20 digits as an input-safety limit, **not** an assertion about Steam's official code format. Leading zeros are normalized to prevent duplicate numeric codes.
@@ -55,6 +56,14 @@ The organizer signs in and opens **Games → Add game**. Each entry has a name, 
 Each registered player can independently tick **I own this** and **I want to play** on any number of games. Open a game's title to see the players and their selections. Lists update every five seconds. Selections use the same browser editing access as player details; other people cannot set your choices. Removing a game removes its selections, and removing a player removes their selections.
 
 The full SQLite backup includes games and selections. **Export directory** remains a player-directory-only export. No store data is fetched and links open separately; prices and flags are entered by the organizer.
+
+## Random teams
+
+Open **Teams**. All registered players are selected initially; uncheck anyone sitting out, or use search with **Select shown** to pick a group. Choose a **Number of teams** (two by default) or **Maximum players per team**, then **Shuffle teams**. The preview explains the split before drawing.
+
+Everyone selected appears exactly once. Teams differ in size by at most one: seven players with a maximum of three per team become 3/2/2. The tool needs 2–100 selected players and at least two nonempty teams. **Shuffle again** draws a fresh random allocation; the same allocation can occur by chance. It does not balance player skill.
+
+Anyone on the LAN can generate a draw once organizer setup is complete. Draws are shown only in that browser and are not saved or broadcast. **Copy teams** shares the names as text, with a multiline manual-copy fallback over LAN HTTP. Changing the selected players or split clears the old result; refreshing the page also clears it. Shuffling never changes player records, game selections or another person's draw.
 
 ## Event checklist
 

@@ -5,25 +5,6 @@ let viewingGame = null;
 let lastGames = "";
 const savingGames = new Set();
 
-function selectTab(name) {
-  for (const tabName of ["players", "games"]) {
-    const active = tabName === name;
-    $(`#${tabName}-tab`).setAttribute("aria-selected", String(active));
-    $(`#${tabName}-tab`).tabIndex = active ? 0 : -1;
-    $(`#${tabName}-panel`).hidden = !active;
-  }
-  $(".steam-help").hidden = name !== "players";
-}
-for (const name of ["players", "games"]) {
-  $(`#${name}-tab`).addEventListener("click", () => selectTab(name));
-  $(`#${name}-tab`).addEventListener("keydown", event => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const next = event.key === "Home" ? "players" : event.key === "End" ? "games" : name === "games" ? "players" : "games";
-    selectTab(next); $(`#${next}-tab`).focus();
-  });
-}
-
 function gamePlayerCount(game) {
   return game.player_count == null ? "Player limit not listed" : `${game.player_count} players per game`;
 }
