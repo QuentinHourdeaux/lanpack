@@ -85,6 +85,7 @@ function render() {
     $("#empty-title").textContent = "The party opens soon.";
     $("#empty-text").textContent = "Players can join after the organizer chooses a password.";
   }
+  if (typeof renderGames === "function") renderGames();
 }
 
 async function refresh() {
@@ -153,7 +154,7 @@ $("#copy-url").addEventListener("click", () => { if (state) copy(state.join_url,
 document.querySelectorAll(".close-dialog").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
 document.addEventListener("keydown", event => {
   if (event.key === "/" && !event.ctrlKey && !event.metaKey && !document.querySelector("dialog[open]") && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
-    event.preventDefault(); $("#search").focus();
+    event.preventDefault(); $("#games-panel").hidden ? $("#search").focus() : $("#game-search").focus();
   }
 });
 
