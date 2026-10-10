@@ -27,7 +27,7 @@ def create_app(config=None):
     app = Flask(__name__)
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("LANPACK_SECRET_KEY", ""),
-        ADMIN_PASSWORD=os.environ.get("LANPACK_ADMIN_PASSWORD", ""),
+        ADMIN_PASSWORD=os.environ.get("LANPACK_ADMIN_PASSWORD", "admin"),
         DATABASE=os.environ.get("LANPACK_DB", "data/lanpack.sqlite"),
         PUBLIC_URL=os.environ.get("LANPACK_PUBLIC_URL", "http://127.0.0.1:8080"),
         EXPECTED_PLAYERS=int(os.environ.get("LANPACK_EXPECTED_PLAYERS", "27")),
@@ -39,7 +39,7 @@ def create_app(config=None):
     )
     if config:
         app.config.update(config)
-    if len(app.config["SECRET_KEY"]) < 32 or len(app.config["ADMIN_PASSWORD"]) < 16:
+    if len(app.config["SECRET_KEY"]) < 32:
         raise RuntimeError("Run ./lanpack setup to generate strong local secrets first.")
     public = urlsplit(app.config["PUBLIC_URL"])
     if (public.scheme not in ("http", "https") or not public.hostname
@@ -49,8 +49,8 @@ def create_app(config=None):
     app.config["PUBLIC_URL"] = f"{public.scheme}://{public.netloc}"
     app.config["TRUSTED_HOSTS"] = ["localhost", "127.0.0.1", public.hostname]
     app.config["SESSION_COOKIE_SECURE"] = public.scheme == "https"
-    admin_hash = generate_password_hash(app.config.pop("ADMIN_PASSWORD"))
-    # No credentials are stored in the participant database or public responses.
+    initial_password = app.config.pop("ADMIN_PASSWORD") or "admin"
+    # Import legacy configuration once; subsequent changes use only the stored hash.
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(app.config["DATABASE"]) as db:
         db.execute("PRAGMA journal_mode=WAL")
@@ -59,6 +59,14 @@ def create_app(config=None):
             steam_code TEXT NOT NULL UNIQUE, edit_hash TEXT NOT NULL UNIQUE,
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS organizer (
+            id INTEGER PRIMARY KEY CHECK (id = 1), password_hash TEXT NOT NULL,
+            setup_required INTEGER NOT NULL, version INTEGER NOT NULL
+        )""")
+        if not db.execute("SELECT 1 FROM organizer WHERE id=1").fetchone():
+            db.execute("INSERT OR IGNORE INTO organizer VALUES (1, ?, ?, 0)",
+                       (generate_password_hash(initial_password), int(initial_password == "admin")))
+    del initial_password
     attempts = defaultdict(deque)
     rate_lock = threading.Lock()
 
@@ -105,6 +113,13 @@ def create_app(config=None):
             (hashlib.sha256(token.encode()).hexdigest(),),
         ).fetchone()
 
+    def organizer():
+        return database().execute("SELECT * FROM organizer WHERE id=1").fetchone()
+
+    def is_organizer():
+        return (session.get("organizer") is True
+                and session.get("organizer_version") == organizer()["version"])
+
     @app.before_request
     def protect_request():
         # Force trusted-host validation even for endpoints that never read request.host.
@@ -121,8 +136,13 @@ def create_app(config=None):
             if rate_limit("write", 120):
                 return error("Too many changes. Wait a minute and try again.", 429)
         if request.path.startswith("/api/admin/") and request.path != "/api/admin/login":
-            if not session.get("organizer"):
-                return error("Organizer access required.", 403)
+            if not is_organizer():
+                return error("Organizer access required. Sign in again.", 403)
+            if organizer()["setup_required"] and request.path not in (
+                    "/api/admin/password", "/api/admin/logout"):
+                return error("Choose a new organizer password first.", 403)
+        if request.path.startswith("/api/players") and organizer()["setup_required"]:
+            return error("The organizer must finish setup before players can join.", 403)
 
     @app.after_request
     def security_headers(response):
@@ -183,9 +203,10 @@ def create_app(config=None):
         players = [dict(row) for row in database().execute(
             f"SELECT {PUBLIC_FIELDS} FROM players ORDER BY nickname COLLATE NOCASE, id"
         )]
-        own = mine()
-        return jsonify(players=players, me=dict(own) if own else None,
-                       csrf=session["csrf"], organizer=bool(session.get("organizer")),
+        setup_required = bool(organizer()["setup_required"])
+        own = mine() if not setup_required else None
+        return jsonify(players=[] if setup_required else players, me=dict(own) if own else None,
+                       csrf=session["csrf"], organizer=is_organizer(), setup_required=setup_required,
                        join_url=app.config["PUBLIC_URL"], expected=app.config["EXPECTED_PLAYERS"])
 
     @app.get("/join.svg")
@@ -268,11 +289,44 @@ def create_app(config=None):
             return error("Too many sign-in attempts. Wait a minute.", 429)
         data = request.get_json()
         password = data.get("password") if isinstance(data, dict) else None
-        if not isinstance(password, str) or not check_password_hash(admin_hash, password):
+        account = organizer()
+        if not isinstance(password, str) or len(password) > 128 or not check_password_hash(account["password_hash"], password):
             return error("Incorrect organizer password.", 401)
         session.clear()
         session["csrf"] = secrets.token_urlsafe(32)
         session["organizer"] = True
+        session["organizer_version"] = account["version"]
+        session.permanent = True
+        return jsonify(ok=True, csrf=session["csrf"])
+
+    @app.post("/api/admin/password")
+    def change_password():
+        if rate_limit("password", 5):
+            return error("Too many password attempts. Wait a minute.", 429)
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return error("Enter your current and new passwords.")
+        current, new = data.get("current_password"), data.get("new_password")
+        account = organizer()
+        if (not isinstance(current, str) or len(current) > 128
+                or not check_password_hash(account["password_hash"], current)):
+            return error("Incorrect current password.", 401)
+        if not isinstance(new, str) or not 12 <= len(new) <= 128 or new.isspace():
+            return error("Use a new password with 12–128 characters.")
+        if new == current:
+            return error("Choose a different password.")
+        if new != data.get("confirm_password"):
+            return error("The new passwords do not match.")
+        result = database().execute(
+            "UPDATE organizer SET password_hash=?, setup_required=0, version=version+1 WHERE id=1 AND version=?",
+            (generate_password_hash(new), account["version"]),
+        )
+        database().commit()
+        if not result.rowcount:
+            return error("The password was changed in another session. Sign in again.", 409)
+        session.clear()
+        session.update(organizer=True, organizer_version=account["version"] + 1,
+                       csrf=secrets.token_urlsafe(32))
         session.permanent = True
         return jsonify(ok=True, csrf=session["csrf"])
 

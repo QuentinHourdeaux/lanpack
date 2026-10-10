@@ -34,7 +34,7 @@ def setup():
     values = read_env()
     defaults = {
         "LANPACK_SECRET_KEY": secrets.token_urlsafe(48),
-        "LANPACK_ADMIN_PASSWORD": secrets.token_urlsafe(24),
+        "LANPACK_ADMIN_PASSWORD": "admin",
         "LANPACK_BIND_IP": "127.0.0.1", "LANPACK_PORT": "8080",
         "LANPACK_PUBLIC_URL": "http://127.0.0.1:8080", "LANPACK_EXPECTED_PLAYERS": "27",
     }
@@ -68,7 +68,7 @@ def main():
     sub.add_parser("stop", help="Stop the app; keep its database")
     sub.add_parser("status", help="Show container status")
     sub.add_parser("logs", help="Show recent logs")
-    sub.add_parser("password", help="Reveal the local organizer password")
+    sub.add_parser("password", help="Show initial password status (requires running app)")
     sub.add_parser("backup", help="Save a consistent private database backup")
     args = parser.parse_args()
     if args.command == "setup":
@@ -100,6 +100,17 @@ def main():
             sys.exit("Docker is missing. Install and open Docker Desktop, then retry.")
         # Reuse the already-built image at the venue, even without internet.
         build_flag = "--build" if args.build or not cached else "--no-build"
+        if not address.is_loopback:
+            if build_flag == "--build":
+                docker("build")
+            check = ("from app import create_app; import sqlite3; a=create_app(); "
+                     "d=sqlite3.connect(a.config['DATABASE']); "
+                     "print(d.execute('SELECT setup_required FROM organizer WHERE id=1').fetchone()[0])")
+            if docker("run", "--rm", "--no-deps", "-T", "lanpack", "python", "-c", check, capture=True).strip() == "1":
+                sys.exit("Finish organizer setup on this Mac first: ./lanpack start\n"
+                         "Open http://127.0.0.1:8080, sign in with admin and choose a new password.\n"
+                         "Then run ./lanpack start --ip YOUR_LAN_IP again.")
+            build_flag = "--no-build"
         docker("up", build_flag, "-d", "--wait", "--wait-timeout", "90")
         print(f"\nLANpack is ready: {values['LANPACK_PUBLIC_URL']}")
         print("Organizer password: ./lanpack password")
@@ -118,7 +129,14 @@ def main():
         values = read_env()
         if not values.get("LANPACK_ADMIN_PASSWORD"):
             sys.exit("Run ./lanpack setup first.")
-        print(values["LANPACK_ADMIN_PASSWORD"])
+        code = ("import sqlite3; d=sqlite3.connect('/app/data/lanpack.sqlite'); "
+                "print(d.execute('SELECT version FROM organizer WHERE id=1').fetchone()[0])")
+        version = docker("exec", "-T", "lanpack", "python", "-c", code, capture=True).strip()
+        if version == "0":
+            print(values["LANPACK_ADMIN_PASSWORD"])
+        else:
+            print("The organizer password was changed in the app and cannot be displayed. "
+                  "Only its hash is stored. Use Organizer access → Change password.")
     elif args.command == "backup":
         # SQLite backup API gives a consistent snapshot, including committed WAL data.
         code = ("import sqlite3,base64; "

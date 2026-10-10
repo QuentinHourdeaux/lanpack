@@ -19,6 +19,7 @@
     </header>
 
     <main>
+      <aside class="error-banner" id="setup-banner" hidden><strong>Organizer setup comes first.</strong> Sign in with <code>admin</code> and choose your own password to open the party. <button class="button small" id="setup-button">Set up organizer ↗</button></aside>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <div class="eyebrow"><span class="tiny-cross">✳</span> SAME ROOM. NEXT GAME.</div>
@@ -44,7 +45,7 @@
           <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a name, nickname or friend code…" aria-label="Search players" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
           <div class="attendance"><strong id="attendance">0 / 27</strong><span>checked in</span><progress id="progress" value="0" max="27" aria-label="Players checked in"></progress></div>
         </div>
-        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
+        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
         <div class="error-banner" id="load-error" role="alert" hidden></div>
         <div class="player-grid" id="players"></div>
         <div class="empty-state" id="empty-state"><span class="empty-icon" aria-hidden="true">＋</span><h3 id="empty-title">First one here?</h3><p id="empty-text">Add your details and get the party started.</p><button class="button" id="empty-join" disabled>Join the party ↗</button></div>
@@ -77,6 +78,16 @@
   </dialog>
 
   <dialog id="admin-dialog" aria-labelledby="admin-title"><form id="admin-form"><div class="dialog-heading"><span class="eyebrow">HOST CONTROLS</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="admin-title">Organizer access.</h2><p class="dialog-intro">Correct player details, remove entries and export the directory.</p><label>Organizer password<input name="password" type="password" required autocomplete="current-password"></label><p class="form-error" id="admin-error" role="alert" hidden></p><button class="button primary full" type="submit">Unlock controls ↗</button></form></dialog>
+
+  <dialog id="password-dialog" aria-labelledby="password-title"><form id="password-form">
+    <div class="dialog-heading"><span class="eyebrow">ORGANIZER SECURITY</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
+    <h2 id="password-title">Change password.</h2><p class="dialog-intro" id="password-intro">Other organizer sessions will be signed out. Player entries stay unchanged.</p>
+    <label>Current password<input name="current_password" type="password" autocomplete="current-password" maxlength="128" required></label>
+    <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+    <label>Confirm new password<input name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+    <p class="form-help">Use at least 12 characters. A few unrelated words work well.</p>
+    <p class="form-error" id="password-error" role="alert" hidden></p><button class="button primary full" type="submit">Save password ↗</button>
+  </form></dialog>
 
   <dialog id="copy-dialog" aria-labelledby="copy-title"><div class="dialog-heading"><span class="eyebrow">COPY & GO</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="copy-title">Ready to copy.</h2><p class="dialog-intro">Your browser needs a manual copy. Hold the selected text, or press Ctrl/Cmd+C.</p><input id="manual-copy" aria-label="Text to copy" readonly><button class="button full close-dialog" type="button">Done</button></dialog>
 

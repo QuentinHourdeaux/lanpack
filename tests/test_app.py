@@ -163,6 +163,68 @@ class LANpackTests(unittest.TestCase):
             self.assertEqual(self.write("/api/admin/login", {"password": "wrong"}).status_code, 401)
         self.assertEqual(self.write("/api/admin/login", {"password": "wrong"}).status_code, 429)
 
+    def change(self, current, new="four unrelated words here", client=None, **overrides):
+        data = dict(current_password=current, new_password=new, confirm_password=new)
+        data.update(overrides)
+        return self.write("/api/admin/password", data, client=client)
+
+    def test_first_run_stays_closed_until_password_changed(self):
+        config = {**self.config, "DATABASE": str(Path(self.folder.name) / "fresh.sqlite"),
+                  "ADMIN_PASSWORD": "admin"}
+        fresh = create_app(config)
+        host, guest = fresh.test_client(), fresh.test_client()
+        self.assertTrue(self.state(guest)["setup_required"])
+        self.assertEqual(self.state(guest)["players"], [])
+        self.assertEqual(self.write("/api/players", self.player(), client=guest).status_code, 403)
+        self.assertEqual(self.change("admin", client=guest).status_code, 403)
+        self.assertEqual(self.write("/api/admin/login", {"password": "admin"}, client=host).status_code, 200)
+        self.assertEqual(host.get("/api/admin/export").status_code, 403)
+        self.assertEqual(self.write("/api/players", self.player(), client=host).status_code, 403)
+        self.assertEqual(self.change("admin", "admin", host).status_code, 400)
+        self.assertTrue(self.state(guest)["setup_required"])
+        self.assertEqual(self.change("admin", client=host).status_code, 200)
+        self.assertFalse(self.state(guest)["setup_required"])
+        self.register(guest)
+        self.assertEqual(self.write("/api/admin/login", {"password": "admin"}, client=guest).status_code, 401)
+        restarted = create_app(config).test_client()
+        self.assertFalse(self.state(restarted)["setup_required"])
+        self.assertEqual(self.write("/api/admin/login", {"password": "four unrelated words here"}, client=restarted).status_code, 200)
+
+    def test_password_change_validation_revocation_and_persistence(self):
+        player_id = self.register()
+        self.login()
+        other = self.app.test_client()
+        self.login(other)
+        old = self.config["ADMIN_PASSWORD"]
+        self.assertEqual(self.change("wrong").status_code, 401)
+        for new in ("short", " " * 12, "a" * 129, old):
+            self.assertEqual(self.change(old, new).status_code, 400)
+        self.assertEqual(self.change(old, confirm_password="mismatch").status_code, 400)
+        old_csrf = self.state()["csrf"]
+        self.assertEqual(self.change(old).status_code, 200)
+        self.assertNotEqual(self.state()["csrf"], old_csrf)
+        self.assertTrue(self.state()["organizer"])
+        self.assertFalse(self.state(other)["organizer"])
+        self.assertEqual(other.get("/api/admin/export").status_code, 403)
+        self.assertEqual(self.write(f"/api/admin/players/{player_id}", method="DELETE", client=other).status_code, 403)
+        self.assertEqual(self.state()["me"]["id"], player_id)
+        self.assertEqual(self.write("/api/admin/login", {"password": old}, client=other).status_code, 401)
+        restarted = create_app({**self.config, "ADMIN_PASSWORD": "admin"}).test_client()
+        self.assertEqual(self.write("/api/admin/login", {"password": "four unrelated words here"}, client=restarted).status_code, 200)
+        with sqlite3.connect(self.config["DATABASE"]) as db:
+            row = db.execute("SELECT password_hash, version FROM organizer").fetchone()
+        self.assertNotIn("four unrelated words here", row[0])
+        self.assertEqual(row[1], 1)
+        for path in ("/api/state", "/api/admin/export"):
+            self.assertNotIn(row[0], restarted.get(path).get_data(as_text=True))
+
+    def test_password_change_rate_limit(self):
+        self.login()
+        self.app.config["DISABLE_RATE_LIMITS"] = False
+        for _ in range(5):
+            self.assertEqual(self.change("wrong").status_code, 401)
+        self.assertEqual(self.change("wrong").status_code, 429)
+
     def test_missing_secrets_fail_closed(self):
         with self.assertRaises(RuntimeError):
             create_app({**self.config, "SECRET_KEY": "short"})

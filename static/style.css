@@ -7,3 +7,5 @@
 @media(max-width:370px){.shell{padding:0 14px}.player-grid{grid-template-columns:1fr}.hero-note{display:block;margin-left:0;max-width:none}h1{font-size:49px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 @media(max-width:480px){.player-grid{grid-template-columns:1fr}.player-card{padding:20px}.steam-code>div{flex-wrap:nowrap}.copy-code{min-height:44px;padding-left:10px}.player-actions .text-button{min-height:40px}.hero-note{max-width:145px}.nickname{font-size:23px}}
+
+#setup-banner{margin-top:24px}#setup-banner .button{margin:8px 0 0 10px}.admin-toolbar>div{flex-wrap:wrap}

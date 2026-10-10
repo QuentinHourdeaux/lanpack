@@ -38,14 +38,17 @@ function render() {
   $("#progress").max = Math.max(state.expected, count, 1);
   $("#progress").value = count;
   $("#join-button").textContent = state.me ? "Edit my details ↗" : "Join the party ↗";
-  $("#join-button").disabled = false;
-  $("#empty-join").disabled = false;
+  $("#join-button").disabled = state.setup_required;
+  $("#empty-join").disabled = state.setup_required;
   $("#join-note").textContent = state.me ? `You're in, ${state.me.nickname}.` : "No account. Just your player details.";
   $("#join-url").textContent = state.join_url;
   $("#copy-url").disabled = false;
   const hostname = new URL(state.join_url).hostname;
   $("#local-warning").hidden = !["localhost", "127.0.0.1"].includes(hostname);
-  $("#admin-toolbar").hidden = !state.organizer;
+  $("#admin-toolbar").hidden = !state.organizer || state.setup_required;
+  $("#setup-banner").hidden = !state.setup_required;
+  $(".join-panel").hidden = state.setup_required;
+  $("#setup-button").textContent = state.organizer ? "Choose your password ↗" : "Set up organizer ↗";
   $("#organizer-button").textContent = state.organizer ? "Organizer controls active" : "Organizer access ↗";
 
   const query = $("#search").value.trim().toLocaleLowerCase();
@@ -76,7 +79,12 @@ function render() {
   $("#empty-state").hidden = players.length > 0;
   $("#empty-title").textContent = query ? "No players found." : "First one here?";
   $("#empty-text").textContent = query ? "Try another nickname, name or friend code." : "Add your details and get the party started.";
-  $("#empty-join").hidden = Boolean(query || state.me);
+  $("#empty-join").hidden = Boolean(query || state.me || state.setup_required);
+  if (state.setup_required) {
+    $("#join-note").textContent = "Waiting for organizer setup.";
+    $("#empty-title").textContent = "The party opens soon.";
+    $("#empty-text").textContent = "Players can join after the organizer chooses a password.";
+  }
 }
 
 async function refresh() {
@@ -103,7 +111,7 @@ async function refresh() {
 }
 
 function openPlayer(player = state?.me) {
-  if (!state) return;
+  if (!state || state.setup_required) return;
   editing = player || null;
   const form = $("#player-form");
   form.reset();
@@ -190,11 +198,39 @@ $("#remove-form").addEventListener("submit", event => {
   });
 });
 
-$("#organizer-button").addEventListener("click", () => {
+function openPassword() {
+  $("#password-form").reset();
+  $("#password-error").hidden = true;
+  $("#password-title").textContent = state?.setup_required ? "Make it your party." : "Change password.";
+  $("#password-intro").textContent = state?.setup_required
+    ? "Replace the default admin password before players can join."
+    : "Other organizer sessions will be signed out. Player entries stay unchanged.";
+  $("#password-dialog").showModal();
+}
+
+function openOrganizer() {
+  if (!state) return;
+  if (state.organizer && state.setup_required) { openPassword(); return; }
   if (state?.organizer) { $("#admin-toolbar").scrollIntoView({ block: "center" }); return; }
   $("#admin-form").reset();
   $("#admin-error").hidden = true;
   $("#admin-dialog").showModal();
+}
+$("#organizer-button").addEventListener("click", openOrganizer);
+$("#setup-button").addEventListener("click", openOrganizer);
+$("#change-password").addEventListener("click", openPassword);
+
+$("#password-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  submit(form, $("#password-error"), async () => {
+    const result = await api("/api/admin/password", "POST", Object.fromEntries(new FormData(form)));
+    state.csrf = result.csrf;
+    form.reset();
+    $("#password-dialog").close();
+    toast(state.setup_required ? "Password saved. The party is open!" : "Organizer password changed");
+    await refresh();
+  });
 });
 
 $("#admin-form").addEventListener("submit", event => {
@@ -205,8 +241,9 @@ $("#admin-form").addEventListener("submit", event => {
     if (state) state.csrf = result.csrf;
     form.reset();
     $("#admin-dialog").close();
-    toast("Organizer controls unlocked");
     await refresh();
+    if (state?.setup_required) openPassword();
+    else toast("Organizer controls unlocked");
   });
 });
 

@@ -10,7 +10,7 @@ Bring a laptop, start LANpack, share the QR. Everyone gets a browser-based playe
 - Private editing access remembered in the browser used to register.
 - Copy friend codes, with a manual-copy fallback on browsers that restrict the clipboard over HTTP.
 - QR code and join address generated locally; no CDNs, analytics or external runtime assets.
-- Organizer sign-in, corrections, removals and JSON export.
+- First-run organizer setup, password changes, corrections, removals and JSON export.
 - SQLite persistence, a Docker container and a small launcher for start/stop/backup.
 
 Steam requests happen in Steam. LANpack does not log into Steam, collect Steam credentials, verify account ownership or send friend requests. We deliberately do not derive Steam profile links from codes: that behavior has not been verified against real accounts. Numeric input is bounded to 1–20 digits as an input-safety limit, **not** an assertion about Steam's official code format. Leading zeros are normalized to prevent duplicate numeric codes.
@@ -25,7 +25,9 @@ cd lanpack
 ./lanpack start
 ```
 
-Open **http://127.0.0.1:8080** for host preview. `start` generates strong local secrets in an ignored, owner-readable `.env`; it preserves them on subsequent starts. The app's database lives in the dedicated Docker volume `lanpack_lanpack-data`.
+Open **http://127.0.0.1:8080** on the Mac. Click **Set up organizer**, sign in with **admin**, then choose a new password (12–128 characters). Registration and the directory stay locked until setup is complete. The launcher requires this local setup before publishing on a LAN IP. Do this before sharing access with anyone.
+
+`start` generates a session secret in an ignored, owner-readable `.env`. The organizer password is stored as a salted scrypt hash in the database, in the dedicated Docker volume `lanpack_lanpack-data`.
 
 For participants, find the Mac's active private IPv4 address in **System Settings → Network → your active connection → Details → TCP/IP**, then run:
 
@@ -35,13 +37,15 @@ For participants, find the Mac's active private IPv4 address in **System Setting
 
 Replace that example with your actual address. The launcher checks that the address belongs to this Mac, publishes only that IPv4 interface, and updates the QR and URL. The container always listens on port 8080 internally; use `--port 8090` to change the host port if necessary. Switching IPs recreates the container without deleting registrations. Editing cookies are tied to the browser's hostname: changing the IP may require organizer assistance for players who registered at the old address.
 
-Show the organizer password in your **private terminal**:
+For existing installations, the previous `.env` password is imported once and continues to work. To check the initial password in your **private terminal** while the app is running:
 
 ```sh
 ./lanpack password
 ```
 
-Use **Organizer access** at the bottom of the page. Avoid displaying the password on a projector or posting it in chat. The password is separate from participant editing access; organizer sessions expire after eight hours of inactivity.
+Use **Organizer access → Change password** at any time. Enter your current password, a new password and its confirmation. Other organizer sessions are signed out; players and their editing access are preserved. After changing it, `./lanpack password` cannot display the new password: only its hash is stored. The `.env` password is a bootstrap/migration value only and cannot override an existing database password. Keep the new password in your password manager.
+
+Organizer sessions expire after eight hours of inactivity. Anyone who can reach an unconfigured instance knows the default `admin` password, so complete setup on the Mac before exposing it. If bypassing the launcher with Docker Compose, keep the default loopback binding until setup is complete.
 
 ## Event checklist
 
@@ -53,7 +57,7 @@ Use **Organizer access** at the bottom of the page. Avoid displaying the passwor
 6. Export after registration. Take a full backup before deleting or correcting many entries.
 7. Stop LANpack when finished and remove any temporary firewall allowance you created.
 
-Do not use router port forwarding, a DMZ, a public tunnel or public hosting. This is an event LAN tool. Plain HTTP does not protect traffic from someone monitoring the network; use only low-sensitivity player details and a trusted event network. Browser edit tokens authorize editing but do not prove identity or Steam ownership. Anyone with network access can read the directory or register an entry.
+Do not use router port forwarding, a DMZ, a public tunnel or public hosting. This is an event LAN tool. Plain HTTP does not protect traffic from someone monitoring the network; use only low-sensitivity player details and a trusted event network. Browser edit tokens authorize editing but do not prove identity or Steam ownership. After organizer setup, anyone with network access can read the directory or register an entry.
 
 ## Everyday commands
 
@@ -66,7 +70,7 @@ Do not use router port forwarding, a DMZ, a public tunnel or public hosting. Thi
 ./lanpack start --build          # Rebuild after source changes (host preview)
 ```
 
-The organizer's **Export directory** button downloads participant fields as JSON without editing-token hashes or credentials. This is a portable directory export, not a full restore image. `./lanpack backup` is a full SQLite snapshot including hashed editing tokens; keep it private. Keep `.env` privately if you want existing organizer sessions to survive moving hosts. Raw participant editing cookies remain in the players' browsers.
+The organizer's **Export directory** button downloads participant fields as JSON without editing-token hashes or credentials. This is a portable directory export, not a full restore image. `./lanpack backup` is a full SQLite snapshot including the organizer password hash and hashed editing tokens; keep it private. Keep `.env` privately if you want existing organizer sessions to survive moving hosts. Raw participant editing cookies remain in the players' browsers.
 
 ### Restore a private database backup
 
@@ -86,7 +90,7 @@ This permanently deletes the event database. Export or back up first. Stop with 
 docker volume rm lanpack_lanpack-data
 ```
 
-The next start creates an empty directory. Local exports/backups are separate files; delete them when no longer needed. Avoid `docker system prune` or commands affecting unrelated projects.
+The next start creates an empty directory and bootstraps from `.env` again. Set `LANPACK_ADMIN_PASSWORD=admin` before that start to require fresh organizer setup. Local exports/backups are separate files; delete them when no longer needed. Avoid `docker system prune` or commands affecting unrelated projects.
 
 ## Troubleshooting
 
@@ -108,7 +112,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Tests use temporary databases. They cover concurrent registrations, duplicate codes, validation, CSRF/origin/Host checks, editing isolation, organizer controls, request limits and persistence across app instances. CI's `verify` job runs tests and builds the container.
+Tests use temporary databases. They cover concurrent registrations, duplicate codes, validation, CSRF/origin/Host checks, editing isolation, organizer controls, forced first-run setup, password validation and changes, session revocation, request limits and persistence across app instances. CI's `verify` job runs tests and builds the container.
 
 Public responses and directory exports omit editing credentials. SQL is parameterized; the UI renders participant input as text. Secrets, databases, logs, backups and local environments are ignored by Git and excluded from the build context. Rate limits are per source IP and reset on restart; shared NAT may group multiple players. They are basic abuse controls, not protection for an internet-facing deployment.
 
