@@ -15,7 +15,7 @@ class GamesTests(unittest.TestCase):
 
     def game(self, **overrides):
         return dict(dict(name="Trackmania", player_count=8, url="https://example.com/game",
-                         price="€19.99", cracked=False), **overrides)
+                         price="€19.99", cracked=False, genre="Course"), **overrides)
 
     def add_game(self):
         self.login()
@@ -75,7 +75,7 @@ class GamesTests(unittest.TestCase):
 
     def test_validation_and_unsafe_urls(self):
         self.login()
-        invalid = [dict(name=" "), dict(name="a"*81), dict(price="a"*41), dict(cracked="false"),
+        invalid = [dict(name=" "), dict(name="a"*81), dict(price="a"*41), dict(genre="a"*41), dict(genre=None), dict(cracked="false"),
                    dict(player_count=True), dict(player_count=0), dict(player_count=1000), dict(player_count=2.5)]
         for url in ("javascript:alert(1)", "data:text/html,hi", "//evil.example", "https://user:pass@example.com",
                     "https://example.com\\@evil.example", "https://[bad", "https://example.com:bad", "https://exam ple.com"):
@@ -96,22 +96,33 @@ class GamesTests(unittest.TestCase):
         self.assertEqual(self.choose(game_id, True, True).status_code, 200)
         with sqlite3.connect(self.config["DATABASE"]) as db:
             db.execute("CREATE TABLE games_old (id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER NOT NULL, url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL)")
-            db.execute("INSERT INTO games_old SELECT * FROM games")
+            db.execute("INSERT INTO games_old SELECT id, name, player_count, url, price, cracked FROM games")
             db.execute("DROP TABLE games")
             db.execute("ALTER TABLE games_old RENAME TO games")
         restarted = create_app(self.config).test_client()
         game = self.state(restarted)["games"][0]
         self.assertEqual(game["id"], game_id)
+        self.assertEqual(game["genre"], "")
         self.assertEqual(len(game["players"]), 1)
         self.login(restarted)
         self.assertEqual(self.write(f"/api/admin/games/{game_id}", self.game(player_count=None), "PATCH", restarted).status_code, 200)
         self.assertIsNone(self.state(restarted)["games"][0]["player_count"])
+        self.assertEqual(self.state(restarted)["games"][0]["genre"], "Course")
         self.assertEqual(self.write("/api/admin/games", self.game(name="Unknown limit", player_count=None), client=restarted).status_code, 201)
         with sqlite3.connect(self.config["DATABASE"]) as db:
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
         self.assertEqual(self.write(f"/api/admin/games/{game_id}", method="DELETE", client=restarted).status_code, 200)
         with sqlite3.connect(self.config["DATABASE"]) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM game_interests").fetchone()[0], 0)
+
+    def test_genre_edit_clear_and_persistence(self):
+        game_id = self.add_game()
+        self.assertEqual(self.state()["games"][0]["genre"], "Course")
+        self.assertEqual(self.write(f"/api/admin/games/{game_id}", self.game(genre="  FPS  "), "PATCH").status_code, 200)
+        restarted = create_app(self.config).test_client()
+        self.assertEqual(self.state(restarted)["games"][0]["genre"], "FPS")
+        self.assertEqual(self.write(f"/api/admin/games/{game_id}", self.game(genre=""), "PATCH").status_code, 200)
+        self.assertEqual(self.state()["games"][0]["genre"], "")
 
     def test_persistence_migration_and_setup_gate(self):
         # Simulate the prior release's schema with existing players and organizer.

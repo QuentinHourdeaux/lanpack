@@ -82,6 +82,8 @@ def create_app(config=None):
             db.execute("INSERT INTO games_nullable SELECT * FROM games")
             db.execute("DROP TABLE games")
             db.execute("ALTER TABLE games_nullable RENAME TO games")
+        if not any(row[1] == "genre" for row in db.execute("PRAGMA table_info(games)")):
+            db.execute("ALTER TABLE games ADD COLUMN genre TEXT NOT NULL DEFAULT ''")
         db.execute("""CREATE TABLE IF NOT EXISTS game_interests (
             game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
             player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -248,7 +250,7 @@ def create_app(config=None):
         if not isinstance(data, dict):
             raise ValueError("Enter the game details.")
         result = {}
-        for field, maximum in (("name", 80), ("url", 2048), ("price", 40)):
+        for field, maximum in (("name", 80), ("url", 2048), ("price", 40), ("genre", 40)):
             value = data.get(field, "")
             if not isinstance(value, str) or len(value) > maximum or any(ord(c) < 32 for c in value):
                 raise ValueError(f"{field.capitalize()} must be text, up to {maximum} characters.")
@@ -269,7 +271,7 @@ def create_app(config=None):
                 _ = url.port
             except ValueError:
                 raise ValueError("Use a full http:// or https:// game URL, without login details.")
-        return (result["name"], count, result["url"], result["price"], data["cracked"])
+        return (result["name"], count, result["url"], result["price"], data["cracked"], result["genre"])
 
     @app.post("/api/admin/games")
     def create_game():
@@ -278,7 +280,7 @@ def create_app(config=None):
         except ValueError as exc:
             return error(str(exc))
         game_id = secrets.token_hex(12)
-        database().execute("INSERT INTO games VALUES (?, ?, ?, ?, ?, ?)", (game_id, *values))
+        database().execute("INSERT INTO games (id, name, player_count, url, price, cracked, genre) VALUES (?, ?, ?, ?, ?, ?, ?)", (game_id, *values))
         database().commit()
         return jsonify(id=game_id), 201
 
@@ -289,7 +291,7 @@ def create_app(config=None):
         except ValueError as exc:
             return error(str(exc))
         result = database().execute(
-            "UPDATE games SET name=?, player_count=?, url=?, price=?, cracked=? WHERE id=?", (*values, game_id))
+            "UPDATE games SET name=?, player_count=?, url=?, price=?, cracked=?, genre=? WHERE id=?", (*values, game_id))
         database().commit()
         if not result.rowcount:
             return error("That game no longer exists.", 404)

@@ -32,7 +32,7 @@ function renderGames() {
   if (!state) return;
   const games = state.games || [];
   const query = $("#game-search").value.trim().toLocaleLowerCase();
-  const visible = games.filter(game => game.name.toLocaleLowerCase().includes(query));
+  const visible = games.filter(game => `${game.name} ${game.genre || ""}`.toLocaleLowerCase().includes(query));
   $("#game-count").textContent = games.length;
   $("#add-game").hidden = !state.organizer || state.setup_required;
   $("#games-note").textContent = state.setup_required ? "Waiting for organizer setup."
@@ -47,7 +47,7 @@ function renderGames() {
       card.dataset.id = game.id;
       card.querySelector(".game-name").textContent = game.name;
       card.querySelector(".game-open").setAttribute("aria-label", `View players for ${game.name}`);
-      card.querySelector(".game-meta").textContent = gamePlayerCount(game);
+      card.querySelector(".game-meta").textContent = [game.genre, gamePlayerCount(game)].filter(Boolean).join(" · ");
       card.querySelector(".game-price").textContent = game.price || "Price not listed";
       card.querySelector(".game-cracked").hidden = !game.cracked;
       card.querySelector(".game-totals").textContent = `${game.players.filter(p => p.owns).length} own it · ${game.players.filter(p => p.wants_to_play).length} want to play`;
@@ -73,7 +73,7 @@ function renderGameDetails() {
   const game = state.games.find(game => game.id === viewingGame);
   if (!game) { $("#game-details-dialog").close(); toast("That game was removed"); return; }
   $("#game-details-title").textContent = game.name;
-  $("#game-details-meta").textContent = `${gamePlayerCount(game)} · ${game.price || "Price not listed"}${game.cracked ? " · Cracked" : ""}`;
+  $("#game-details-meta").textContent = `${game.genre ? `${game.genre} · ` : ""}${gamePlayerCount(game)} · ${game.price || "Price not listed"}${game.cracked ? " · Cracked" : ""}`;
   const link = $("#game-details-link");
   link.hidden = !game.url;
   if (game.url) link.href = game.url; else link.removeAttribute("href");
@@ -96,7 +96,7 @@ function renderGameDetails() {
 function openGameForm(game = null) {
   editingGame = game;
   const form = $("#game-form"); form.reset();
-  for (const key of ["name", "player_count", "url", "price"]) form.elements[key].value = game?.[key] ?? "";
+  for (const key of ["name", "genre", "player_count", "url", "price"]) form.elements[key].value = game?.[key] ?? "";
   form.elements.cracked.checked = Boolean(game?.cracked);
   $("#game-title").textContent = game ? "Edit game." : "Add a game.";
   $("#game-error").hidden = true;

@@ -60,7 +60,7 @@
       <section id="games-panel" role="tabpanel" aria-labelledby="games-tab" hidden>
         <div class="directory-heading"><div class="section-title"><span class="section-marker">02</span><h2>What are we playing?</h2></div><button class="button small" id="add-game" hidden>Add game ＋</button></div>
         <p class="games-intro" id="games-note">Tick what you own and what you want to play. Open a game to see who’s in.</p>
-        <label class="search game-search"><span aria-hidden="true">⌕</span><input id="game-search" type="search" aria-label="Search games" placeholder="Find a game…" autocomplete="off"></label>
+        <label class="search game-search"><span aria-hidden="true">⌕</span><input id="game-search" type="search" aria-label="Search games" placeholder="Find a game or genre…" autocomplete="off"></label>
         <div class="player-grid" id="games"></div>
         <div class="empty-state" id="games-empty"><h3>No games yet.</h3><p>The organizer can add games to get things started.</p></div>
       </section>
@@ -90,6 +90,7 @@
   <dialog id="game-dialog" aria-labelledby="game-title"><form id="game-form">
     <div class="dialog-heading"><span class="eyebrow">GAME CATALOG</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="game-title">Add a game.</h2>
     <label>Game name<input name="name" maxlength="80" required placeholder="e.g. Trackmania"></label>
+    <label>Genre <span class="muted">(optional)</span><input name="genre" maxlength="40" placeholder="e.g. FPS, Course, Party"></label>
     <label>Players per game <span class="muted">(optional)</span><input name="player_count" type="number" min="1" max="999" step="1" placeholder="e.g. 8"></label>
     <label>Game URL <span class="muted">(optional)</span><input name="url" type="url" maxlength="2048" placeholder="https://…"></label>
     <label>Price <span class="muted">(optional)</span><input name="price" maxlength="40" placeholder="e.g. Free or €19.99"></label>
