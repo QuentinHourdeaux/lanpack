@@ -17,3 +17,5 @@
 @media(max-width:700px){.teams-workspace{grid-template-columns:1fr;gap:15px}.team-picker,.team-settings{padding:16px}.team-player-picker{max-height:250px}.team-result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.team-result-card{padding:13px}.team-result-heading{flex-wrap:wrap}.section-tabs button{padding:12px 16px}}
 
 #manual-copy{width:100%;resize:vertical;padding:12px;background:#10160d;border:1px solid #414b37;border-radius:8px;color:var(--text);font:inherit;font-size:13px}
+
+.attendance{white-space:normal}.attendance strong{white-space:nowrap}.attendance progress{flex-shrink:0}@media(max-width:1000px){.admin-toolbar{flex-wrap:wrap}}

@@ -30,7 +30,7 @@ def create_app(config=None):
         ADMIN_PASSWORD=os.environ.get("LANPACK_ADMIN_PASSWORD", "admin"),
         DATABASE=os.environ.get("LANPACK_DB", "data/lanpack.sqlite"),
         PUBLIC_URL=os.environ.get("LANPACK_PUBLIC_URL", "http://127.0.0.1:8080"),
-        EXPECTED_PLAYERS=int(os.environ.get("LANPACK_EXPECTED_PLAYERS", "27")),
+        EXPECTED_PLAYERS=int(os.environ.get("LANPACK_EXPECTED_PLAYERS", "25")),
         MAX_CONTENT_LENGTH=4096,
         SESSION_COOKIE_NAME="lanpack_session",
         SESSION_COOKIE_HTTPONLY=True,
@@ -90,6 +90,10 @@ def create_app(config=None):
             owns INTEGER NOT NULL, wants_to_play INTEGER NOT NULL,
             PRIMARY KEY (game_id, player_id)
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS event_settings (
+            id INTEGER PRIMARY KEY CHECK (id=1), expected_players INTEGER NOT NULL
+        )""")
+        db.execute("INSERT OR IGNORE INTO event_settings VALUES (1, ?)", (app.config["EXPECTED_PLAYERS"],))
     del initial_password
     attempts = defaultdict(deque)
     rate_lock = threading.Lock()
@@ -233,7 +237,7 @@ def create_app(config=None):
         return jsonify(players=[] if setup_required else players, me=dict(own) if own else None,
                        csrf=session["csrf"], organizer=is_organizer(), setup_required=setup_required,
                        games=[] if setup_required else games_state(),
-                       join_url=app.config["PUBLIC_URL"], expected=app.config["EXPECTED_PLAYERS"])
+                       join_url=app.config["PUBLIC_URL"], expected=database().execute("SELECT expected_players FROM event_settings WHERE id=1").fetchone()[0])
 
     def games_state():
         games = {row["id"]: {**dict(row), "cracked": bool(row["cracked"]), "players": []}
@@ -335,6 +339,16 @@ def create_app(config=None):
         buffer = io.BytesIO()
         qr.save(buffer)
         return app.response_class(buffer.getvalue(), mimetype="image/svg+xml")
+
+    @app.patch("/api/admin/settings")
+    def update_settings():
+        data = request.get_json()
+        expected = data.get("expected_players") if isinstance(data, dict) else None
+        if type(expected) is not int or not 1 <= expected <= 999:
+            return error("Enter an expected headcount from 1 to 999.")
+        database().execute("UPDATE event_settings SET expected_players=? WHERE id=1", (expected,))
+        database().commit()
+        return jsonify(ok=True)
 
     @app.post("/api/teams/shuffle")
     def shuffle_teams():

@@ -36,7 +36,7 @@ def setup():
         "LANPACK_SECRET_KEY": secrets.token_urlsafe(48),
         "LANPACK_ADMIN_PASSWORD": "admin",
         "LANPACK_BIND_IP": "127.0.0.1", "LANPACK_PORT": "8080",
-        "LANPACK_PUBLIC_URL": "http://127.0.0.1:8080", "LANPACK_EXPECTED_PLAYERS": "27",
+        "LANPACK_PUBLIC_URL": "http://127.0.0.1:8080", "LANPACK_EXPECTED_PLAYERS": "25",
     }
     for key, value in defaults.items():
         values.setdefault(key, value)

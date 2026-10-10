@@ -59,7 +59,7 @@ function render() {
   if (!state) return;
   const count = state.players.length;
   $("#player-count").textContent = count;
-  $("#attendance").textContent = `${count} / ${state.expected}`;
+  $("#attendance").textContent = `${count} checked in · ${state.expected} expected`;
   $("#progress").max = Math.max(state.expected, count, 1);
   $("#progress").value = count;
   $("#join-button").textContent = state.me ? "Edit my details ↗" : "Join the party ↗";
@@ -282,6 +282,23 @@ $("#logout").addEventListener("click", async () => {
   try { await api("/api/admin/logout", "POST"); await refresh(); toast("Signed out"); }
   catch (error) { toast(error.message); }
   finally { $("#logout").disabled = false; }
+});
+
+$("#event-settings").addEventListener("click", () => {
+  if (!state?.organizer) return;
+  $("#settings-form").elements.expected_players.value = state.expected;
+  $("#settings-error").hidden = true;
+  $("#settings-dialog").showModal();
+});
+$("#settings-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  submit(form, $("#settings-error"), async () => {
+    await api("/api/admin/settings", "PATCH", {expected_players:Number(form.elements.expected_players.value)});
+    $("#settings-dialog").close(); toast("Expected headcount updated");
+    if (refreshing) await refreshing;
+    await refresh();
+  });
 });
 
 refresh();

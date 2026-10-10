@@ -6,7 +6,7 @@ Bring a laptop, start LANpack, share the QR. Everyone gets a browser-based playe
 
 ## What works today
 
-- Registration, live directory, search and a player count (27 expected by default; no hard cap).
+- Registration, live directory, search and a player count (25 expected by default, editable by the organizer; no hard cap).
 - Games tab with organizer-managed name, genre, players per game, optional URL/price and cracked flag; players independently mark ownership and intent to play, and each game lists those players.
 - Private editing access remembered in the browser used to register.
 - Copy friend codes, with a manual-copy fallback on browsers that restrict the clipboard over HTTP.
@@ -64,6 +64,10 @@ Open **Teams**. All registered players are selected initially; uncheck anyone si
 Everyone selected appears exactly once. Teams differ in size by at most one: seven players with a maximum of three per team become 3/2/2. The tool needs 2–100 selected players and at least two nonempty teams. **Shuffle again** draws a fresh random allocation; the same allocation can occur by chance. It does not balance player skill.
 
 Anyone on the LAN can generate a draw once organizer setup is complete. Draws are shown only in that browser and are not saved or broadcast. **Copy teams** shares the names as text, with a multiline manual-copy fallback over LAN HTTP. Changing the selected players or split clears the old result; refreshing the page also clears it. Shuffling never changes player records, game selections or another person's draw.
+
+## Expected attendance
+
+The directory shows checked-in players alongside the expected headcount, which defaults to **25**. Sign in as organizer and click **Expected headcount** to change it (1–999). Everyone sees the update within five seconds. It is an estimate, not a registration limit; changing it does not alter player entries. The value persists in SQLite. `LANPACK_EXPECTED_PLAYERS` only seeds a new database; later changes use the organizer control.
 
 ## Event checklist
 
