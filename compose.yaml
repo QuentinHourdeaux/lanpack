@@ -1,0 +1,23 @@
+services:
+  lanpack:
+    build: .
+    ports:
+      - "${LANPACK_BIND_IP:-127.0.0.1}:${LANPACK_PORT:-8080}:8080"
+    environment:
+      LANPACK_SECRET_KEY: ${LANPACK_SECRET_KEY:?Run ./lanpack setup first}
+      LANPACK_ADMIN_PASSWORD: ${LANPACK_ADMIN_PASSWORD:-admin}
+      LANPACK_PUBLIC_URL: ${LANPACK_PUBLIC_URL:-http://127.0.0.1:8080}
+      LANPACK_EXPECTED_PLAYERS: ${LANPACK_EXPECTED_PLAYERS:-27}
+      LANPACK_DB: /app/data/lanpack.sqlite
+    volumes:
+      - lanpack-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 100
+    mem_limit: 256m
+    restart: unless-stopped
+volumes:
+  lanpack-data:
