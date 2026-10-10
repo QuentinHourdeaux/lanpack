@@ -61,7 +61,10 @@
         <div class="directory-heading"><div class="section-title"><span class="section-marker">02</span><h2>What are we playing?</h2></div><button class="button small" id="add-game" hidden>Add game ＋</button></div>
         <p class="games-intro" id="games-note">Tick what you own and what you want to play. Open a game to see who’s in.</p>
         <label class="search game-search"><span aria-hidden="true">⌕</span><input id="game-search" type="search" aria-label="Search games" placeholder="Find a game or genre…" autocomplete="off"></label>
-        <div class="player-grid" id="games"></div>
+        <div class="game-list" id="game-list"><table class="game-table" aria-label="Games catalog">
+          <thead><tr><th class="game-name-cell" scope="col">Game</th><th class="game-secondary" scope="col">Genre</th><th class="game-secondary game-size-cell" scope="col">Players</th><th class="game-secondary" scope="col">Price / version</th><th class="game-secondary" scope="col">Interested</th><th class="game-check-cell" scope="col">Own</th><th class="game-check-cell" scope="col">Play</th><th class="game-actions" id="game-actions-heading" scope="col" hidden>Manage</th></tr></thead>
+          <tbody id="games"></tbody>
+        </table></div>
         <div class="empty-state" id="games-empty"><h3>No games yet.</h3><p>The organizer can add games to get things started.</p></div>
       </section>
       <aside class="steam-help"><span class="help-symbol" aria-hidden="true">i</span><p><strong>Adding a friend?</strong> Copy their code, open Steam → Friends → Add a Friend, and paste it there. Find your own code on that same page.</p></aside>
@@ -79,13 +82,15 @@
     </article>
   </template>
 
-  <template id="game-template"><article class="game-card">
-    <button class="game-open"><span class="field-caption">VIEW PLAYERS ↗</span><h3 class="game-name"></h3></button>
-    <p class="game-meta"></p><p class="game-price"></p><span class="small-tag game-cracked">CRACKED</span>
-    <p class="game-totals"></p>
-    <div class="game-choices"><label><input type="checkbox" name="owns"> I own this</label><label><input type="checkbox" name="wants_to_play"> I want to play</label></div>
-    <div class="player-actions game-actions" hidden><button class="text-button game-edit">Edit game</button><button class="text-button danger game-remove">Remove</button></div>
-  </article></template>
+  <template id="game-template"><tr class="game-card">
+    <td class="game-name-cell"><button class="game-open"><span class="game-name"></span></button></td>
+    <td class="game-secondary game-genre"></td><td class="game-secondary game-size-cell game-player-count"></td>
+    <td class="game-secondary"><div class="game-price-version"><span class="game-price"></span><span class="small-tag game-cracked">CRACKED</span></div></td>
+    <td class="game-secondary game-totals"></td>
+    <td class="game-check-cell"><label class="game-choice"><input type="checkbox" name="owns"><span class="sr-only">I own this</span></label></td>
+    <td class="game-check-cell"><label class="game-choice"><input type="checkbox" name="wants_to_play"><span class="sr-only">I want to play</span></label></td>
+    <td class="game-actions" hidden><div><button class="text-button game-edit">Edit</button><button class="text-button danger game-remove">Remove</button></div></td>
+  </tr></template>
 
   <dialog id="game-dialog" aria-labelledby="game-title"><form id="game-form">
     <div class="dialog-heading"><span class="eyebrow">GAME CATALOG</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="game-title">Add a game.</h2>

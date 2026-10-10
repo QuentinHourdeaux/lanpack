@@ -47,10 +47,14 @@ function renderGames() {
       card.dataset.id = game.id;
       card.querySelector(".game-name").textContent = game.name;
       card.querySelector(".game-open").setAttribute("aria-label", `View players for ${game.name}`);
-      card.querySelector(".game-meta").textContent = [game.genre, gamePlayerCount(game)].filter(Boolean).join(" · ");
-      card.querySelector(".game-price").textContent = game.price || "Price not listed";
+      card.querySelector(".game-open").title = game.name;
+      card.querySelector(".game-genre").textContent = game.genre || "—";
+      card.querySelector(".game-genre").title = game.genre || "Genre not listed";
+      card.querySelector(".game-player-count").textContent = game.player_count ?? "—";
+      card.querySelector(".game-price").textContent = game.price || (game.cracked ? "" : "—");
+      card.querySelector(".game-price").title = game.price || "Price not listed";
       card.querySelector(".game-cracked").hidden = !game.cracked;
-      card.querySelector(".game-totals").textContent = `${game.players.filter(p => p.owns).length} own it · ${game.players.filter(p => p.wants_to_play).length} want to play`;
+      card.querySelector(".game-totals").textContent = `${game.players.filter(p => p.owns).length} own · ${game.players.filter(p => p.wants_to_play).length} play`;
       const own = game.players.find(p => p.player_id === state.me?.id);
       for (const field of ["owns", "wants_to_play"]) {
         const input = card.querySelector(`[name="${field}"]`);
@@ -63,6 +67,8 @@ function renderGames() {
     }
     $("#games").replaceChildren(fragment);
   }
+  $("#game-actions-heading").hidden = !state.organizer;
+  $("#game-list").hidden = visible.length === 0;
   $("#games-empty").hidden = visible.length > 0;
   $("#games-empty h3").textContent = query ? "No matching games." : "No games yet.";
   $("#games-empty p").textContent = query ? "Try another game name." : "The organizer can add games to get things started.";
