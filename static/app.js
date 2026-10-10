@@ -7,6 +7,31 @@ let lastCards = "";
 let toastTimer;
 let refreshing = null;
 
+const toolTabs = ["players", "games", "teams"];
+
+function selectTab(name) {
+  for (const tabName of toolTabs) {
+    const active = tabName === name;
+    $(`#${tabName}-tab`).setAttribute("aria-selected", String(active));
+    $(`#${tabName}-tab`).tabIndex = active ? 0 : -1;
+    $(`#${tabName}-panel`).hidden = !active;
+  }
+  $(".steam-help").hidden = name !== "players";
+  if (name === "teams" && typeof renderTeams === "function") renderTeams();
+}
+for (const name of toolTabs) {
+  $(`#${name}-tab`).addEventListener("click", () => selectTab(name));
+  $(`#${name}-tab`).addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const index = toolTabs.indexOf(name);
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? toolTabs.length - 1
+      : (index + (event.key === "ArrowRight" ? 1 : -1) + toolTabs.length) % toolTabs.length;
+    const next = toolTabs[nextIndex];
+    selectTab(next); $(`#${next}-tab`).focus();
+  });
+}
+
 function toast(message) {
   $("#toast").textContent = message;
   $("#toast").hidden = false;
@@ -86,6 +111,7 @@ function render() {
     $("#empty-text").textContent = "Players can join after the organizer chooses a password.";
   }
   if (typeof renderGames === "function") renderGames();
+  if (typeof renderTeams === "function") renderTeams();
 }
 
 async function refresh() {
@@ -131,6 +157,7 @@ async function copy(value, description) {
   } catch {
     $("#copy-title").textContent = `Copy ${description.toLocaleLowerCase()}.`;
     $("#manual-copy").value = value;
+    $("#manual-copy").rows = Math.min(12, Math.max(2, value.split("\n").length));
     $("#copy-dialog").showModal();
     $("#manual-copy").focus();
     $("#manual-copy").select();
@@ -154,7 +181,9 @@ $("#copy-url").addEventListener("click", () => { if (state) copy(state.join_url,
 document.querySelectorAll(".close-dialog").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
 document.addEventListener("keydown", event => {
   if (event.key === "/" && !event.ctrlKey && !event.metaKey && !document.querySelector("dialog[open]") && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
-    event.preventDefault(); $("#games-panel").hidden ? $("#search").focus() : $("#game-search").focus();
+    event.preventDefault();
+    const searchId = !$("#teams-panel").hidden ? "#team-search" : !$("#games-panel").hidden ? "#game-search" : "#search";
+    $(searchId).focus();
   }
 });
 

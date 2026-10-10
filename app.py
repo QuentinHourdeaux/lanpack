@@ -166,7 +166,7 @@ def create_app(config=None):
             if organizer()["setup_required"] and request.path not in (
                     "/api/admin/password", "/api/admin/logout"):
                 return error("Choose a new organizer password first.", 403)
-        if request.path.startswith(("/api/players", "/api/games")) and organizer()["setup_required"]:
+        if request.path.startswith(("/api/players", "/api/games", "/api/teams")) and organizer()["setup_required"]:
             return error("The organizer must finish setup before players can join.", 403)
 
     @app.after_request
@@ -335,6 +335,31 @@ def create_app(config=None):
         buffer = io.BytesIO()
         qr.save(buffer)
         return app.response_class(buffer.getvalue(), mimetype="image/svg+xml")
+
+    @app.post("/api/teams/shuffle")
+    def shuffle_teams():
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return error("Choose players and how to split the teams.")
+        ids = data.get("player_ids")
+        if (not isinstance(ids, list) or not 2 <= len(ids) <= 100
+                or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{24}", value) for value in ids)
+                or len(set(ids)) != len(ids)):
+            return error("Select 2–100 different players.")
+        mode, amount = data.get("mode"), data.get("amount")
+        if mode not in ("team_count", "team_size") or type(amount) is not int or not 1 <= amount <= 100:
+            return error("Enter a whole team count or maximum team size from 1 to 100.")
+        count = amount if mode == "team_count" else (len(ids) + amount - 1) // amount
+        if not 2 <= count <= len(ids):
+            return error("Choose at least two teams, with at least one player per team.")
+        players = [dict(row) for row in database().execute(
+            "SELECT id, name, nickname FROM players WHERE id IN (" + ",".join("?" for _ in ids) + ")", ids)]
+        if len(players) != len(ids):
+            return error("A selected player left the directory. Refresh and choose again.", 409)
+        secrets.SystemRandom().shuffle(players)
+        teams = [dict(name=f"Team {index + 1}", players=players[index::count]) for index in range(count)]
+        # A draw is private to the requesting browser and never changes shared state.
+        return jsonify(teams=teams)
 
     @app.post("/api/players")
     def register():
