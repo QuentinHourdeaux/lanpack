@@ -50,7 +50,7 @@ Organizer sessions expire after eight hours of inactivity. Anyone who can reach 
 
 ## Games
 
-The organizer signs in and opens **Games → Add game**. Each entry has a name, players per game (1–999), an optional http(s) URL, an optional price label (for example `Free` or `€19.99`), and a **Cracked** checkbox. The player count describes the game/session size; it does not cap interest or registration. Only the organizer can add, edit or remove catalog entries.
+The organizer signs in and opens **Games → Add game**. Each entry has a name, optional players per game (1–999; leave blank when unknown), an optional http(s) URL, an optional price label (for example `Free` or `€19.99`), and a **Cracked** checkbox. The player count describes the game/session size; it does not cap interest or registration. Only the organizer can add, edit or remove catalog entries.
 
 Each registered player can independently tick **I own this** and **I want to play** on any number of games. Open a game's title to see the players and their selections. Lists update every five seconds. Selections use the same browser editing access as player details; other people cannot set your choices. Removing a game removes its selections, and removing a player removes their selections.
 

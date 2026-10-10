@@ -67,9 +67,21 @@ def create_app(config=None):
             db.execute("INSERT OR IGNORE INTO organizer VALUES (1, ?, ?, 0)",
                        (generate_password_hash(initial_password), int(initial_password == "admin")))
         db.execute("""CREATE TABLE IF NOT EXISTS games (
-            id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER NOT NULL,
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER,
             url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL
         )""")
+        # Older catalog databases required a player count. Rebuild only that table;
+        # startup uses a connection with foreign keys off, preserving interest rows.
+        if any(row[1] == "player_count" and row[3] for row in db.execute("PRAGMA table_info(games)")):
+            if not db.in_transaction:
+                db.execute("BEGIN")
+            db.execute("""CREATE TABLE games_nullable (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER,
+                url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL
+            )""")
+            db.execute("INSERT INTO games_nullable SELECT * FROM games")
+            db.execute("DROP TABLE games")
+            db.execute("ALTER TABLE games_nullable RENAME TO games")
         db.execute("""CREATE TABLE IF NOT EXISTS game_interests (
             game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
             player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -244,8 +256,8 @@ def create_app(config=None):
         if not result["name"]:
             raise ValueError("Enter a game name.")
         count = data.get("player_count")
-        if type(count) is not int or not 1 <= count <= 999:
-            raise ValueError("Players per game must be a whole number from 1 to 999.")
+        if count is not None and (type(count) is not int or not 1 <= count <= 999):
+            raise ValueError("Leave players per game blank, or enter a whole number from 1 to 999.")
         if type(data.get("cracked")) is not bool:
             raise ValueError("Cracked must be true or false.")
         if result["url"]:

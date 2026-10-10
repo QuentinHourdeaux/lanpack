@@ -24,6 +24,10 @@ for (const name of ["players", "games"]) {
   });
 }
 
+function gamePlayerCount(game) {
+  return game.player_count == null ? "Player limit not listed" : `${game.player_count} players per game`;
+}
+
 function renderGames() {
   if (!state) return;
   const games = state.games || [];
@@ -43,7 +47,7 @@ function renderGames() {
       card.dataset.id = game.id;
       card.querySelector(".game-name").textContent = game.name;
       card.querySelector(".game-open").setAttribute("aria-label", `View players for ${game.name}`);
-      card.querySelector(".game-meta").textContent = `${game.player_count} players per game`;
+      card.querySelector(".game-meta").textContent = gamePlayerCount(game);
       card.querySelector(".game-price").textContent = game.price || "Price not listed";
       card.querySelector(".game-cracked").hidden = !game.cracked;
       card.querySelector(".game-totals").textContent = `${game.players.filter(p => p.owns).length} own it · ${game.players.filter(p => p.wants_to_play).length} want to play`;
@@ -69,7 +73,7 @@ function renderGameDetails() {
   const game = state.games.find(game => game.id === viewingGame);
   if (!game) { $("#game-details-dialog").close(); toast("That game was removed"); return; }
   $("#game-details-title").textContent = game.name;
-  $("#game-details-meta").textContent = `${game.player_count} players per game · ${game.price || "Price not listed"}${game.cracked ? " · Cracked" : ""}`;
+  $("#game-details-meta").textContent = `${gamePlayerCount(game)} · ${game.price || "Price not listed"}${game.cracked ? " · Cracked" : ""}`;
   const link = $("#game-details-link");
   link.hidden = !game.url;
   if (game.url) link.href = game.url; else link.removeAttribute("href");
@@ -134,7 +138,7 @@ $("#game-form").addEventListener("submit", event => {
   event.preventDefault(); const form = event.currentTarget;
   submit(form, $("#game-error"), async () => {
     const data = Object.fromEntries(new FormData(form));
-    data.player_count = Number(data.player_count); data.cracked = form.elements.cracked.checked;
+    data.player_count = data.player_count.trim() === "" ? null : Number(data.player_count); data.cracked = form.elements.cracked.checked;
     await api(editingGame ? `/api/admin/games/${editingGame.id}` : "/api/admin/games", editingGame ? "PATCH" : "POST", data);
     $("#game-dialog").close(); toast(editingGame ? "Game updated" : "Game added");
     if (refreshing) await refreshing;

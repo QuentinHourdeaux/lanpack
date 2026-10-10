@@ -90,6 +90,29 @@ class GamesTests(unittest.TestCase):
         self.assertEqual(self.write("/api/admin/games", self.game(url="", price="", name="<b>Game</b>")).status_code, 201)
         self.assertNotIn("<b>Game</b>", self.client.get("/").get_data(as_text=True))
 
+    def test_nullable_player_count_migration_keeps_games_and_selections(self):
+        game_id = self.add_game()
+        self.register()
+        self.assertEqual(self.choose(game_id, True, True).status_code, 200)
+        with sqlite3.connect(self.config["DATABASE"]) as db:
+            db.execute("CREATE TABLE games_old (id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER NOT NULL, url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL)")
+            db.execute("INSERT INTO games_old SELECT * FROM games")
+            db.execute("DROP TABLE games")
+            db.execute("ALTER TABLE games_old RENAME TO games")
+        restarted = create_app(self.config).test_client()
+        game = self.state(restarted)["games"][0]
+        self.assertEqual(game["id"], game_id)
+        self.assertEqual(len(game["players"]), 1)
+        self.login(restarted)
+        self.assertEqual(self.write(f"/api/admin/games/{game_id}", self.game(player_count=None), "PATCH", restarted).status_code, 200)
+        self.assertIsNone(self.state(restarted)["games"][0]["player_count"])
+        self.assertEqual(self.write("/api/admin/games", self.game(name="Unknown limit", player_count=None), client=restarted).status_code, 201)
+        with sqlite3.connect(self.config["DATABASE"]) as db:
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(self.write(f"/api/admin/games/{game_id}", method="DELETE", client=restarted).status_code, 200)
+        with sqlite3.connect(self.config["DATABASE"]) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM game_interests").fetchone()[0], 0)
+
     def test_persistence_migration_and_setup_gate(self):
         # Simulate the prior release's schema with existing players and organizer.
         player_id = self.register()
