@@ -66,6 +66,30 @@ def create_app(config=None):
         if not db.execute("SELECT 1 FROM organizer WHERE id=1").fetchone():
             db.execute("INSERT OR IGNORE INTO organizer VALUES (1, ?, ?, 0)",
                        (generate_password_hash(initial_password), int(initial_password == "admin")))
+        db.execute("""CREATE TABLE IF NOT EXISTS games (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER,
+            url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL
+        )""")
+        # Older catalog databases required a player count. Rebuild only that table;
+        # startup uses a connection with foreign keys off, preserving interest rows.
+        if any(row[1] == "player_count" and row[3] for row in db.execute("PRAGMA table_info(games)")):
+            if not db.in_transaction:
+                db.execute("BEGIN")
+            db.execute("""CREATE TABLE games_nullable (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, player_count INTEGER,
+                url TEXT NOT NULL, price TEXT NOT NULL, cracked INTEGER NOT NULL
+            )""")
+            db.execute("INSERT INTO games_nullable SELECT * FROM games")
+            db.execute("DROP TABLE games")
+            db.execute("ALTER TABLE games_nullable RENAME TO games")
+        if not any(row[1] == "genre" for row in db.execute("PRAGMA table_info(games)")):
+            db.execute("ALTER TABLE games ADD COLUMN genre TEXT NOT NULL DEFAULT ''")
+        db.execute("""CREATE TABLE IF NOT EXISTS game_interests (
+            game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+            player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+            owns INTEGER NOT NULL, wants_to_play INTEGER NOT NULL,
+            PRIMARY KEY (game_id, player_id)
+        )""")
     del initial_password
     attempts = defaultdict(deque)
     rate_lock = threading.Lock()
@@ -74,6 +98,7 @@ def create_app(config=None):
         if "db" not in g:
             g.db = sqlite3.connect(app.config["DATABASE"], timeout=10)
             g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys=ON")
         return g.db
 
     @app.teardown_appcontext
@@ -141,7 +166,7 @@ def create_app(config=None):
             if organizer()["setup_required"] and request.path not in (
                     "/api/admin/password", "/api/admin/logout"):
                 return error("Choose a new organizer password first.", 403)
-        if request.path.startswith("/api/players") and organizer()["setup_required"]:
+        if request.path.startswith(("/api/players", "/api/games")) and organizer()["setup_required"]:
             return error("The organizer must finish setup before players can join.", 403)
 
     @app.after_request
@@ -207,7 +232,101 @@ def create_app(config=None):
         own = mine() if not setup_required else None
         return jsonify(players=[] if setup_required else players, me=dict(own) if own else None,
                        csrf=session["csrf"], organizer=is_organizer(), setup_required=setup_required,
+                       games=[] if setup_required else games_state(),
                        join_url=app.config["PUBLIC_URL"], expected=app.config["EXPECTED_PLAYERS"])
+
+    def games_state():
+        games = {row["id"]: {**dict(row), "cracked": bool(row["cracked"]), "players": []}
+                 for row in database().execute("SELECT * FROM games ORDER BY name COLLATE NOCASE, id")}
+        for row in database().execute("SELECT * FROM game_interests"):
+            if row["game_id"] not in games:
+                continue  # A game may have been added since the catalog query.
+            games[row["game_id"]]["players"].append(dict(
+                player_id=row["player_id"], owns=bool(row["owns"]), wants_to_play=bool(row["wants_to_play"])))
+        return list(games.values())
+
+    def game_payload():
+        data = request.get_json()
+        if not isinstance(data, dict):
+            raise ValueError("Enter the game details.")
+        result = {}
+        for field, maximum in (("name", 80), ("url", 2048), ("price", 40), ("genre", 40)):
+            value = data.get(field, "")
+            if not isinstance(value, str) or len(value) > maximum or any(ord(c) < 32 for c in value):
+                raise ValueError(f"{field.capitalize()} must be text, up to {maximum} characters.")
+            result[field] = value.strip()
+        if not result["name"]:
+            raise ValueError("Enter a game name.")
+        count = data.get("player_count")
+        if count is not None and (type(count) is not int or not 1 <= count <= 999):
+            raise ValueError("Leave players per game blank, or enter a whole number from 1 to 999.")
+        if type(data.get("cracked")) is not bool:
+            raise ValueError("Cracked must be true or false.")
+        if result["url"]:
+            try:
+                url = urlsplit(result["url"])
+                if (url.scheme not in ("http", "https") or not url.hostname or url.username
+                        or url.password or any(c.isspace() for c in result["url"]) or "\\" in result["url"]):
+                    raise ValueError()
+                _ = url.port
+            except ValueError:
+                raise ValueError("Use a full http:// or https:// game URL, without login details.")
+        return (result["name"], count, result["url"], result["price"], data["cracked"], result["genre"])
+
+    @app.post("/api/admin/games")
+    def create_game():
+        try:
+            values = game_payload()
+        except ValueError as exc:
+            return error(str(exc))
+        game_id = secrets.token_hex(12)
+        database().execute("INSERT INTO games (id, name, player_count, url, price, cracked, genre) VALUES (?, ?, ?, ?, ?, ?, ?)", (game_id, *values))
+        database().commit()
+        return jsonify(id=game_id), 201
+
+    @app.patch("/api/admin/games/<game_id>")
+    def update_game(game_id):
+        try:
+            values = game_payload()
+        except ValueError as exc:
+            return error(str(exc))
+        result = database().execute(
+            "UPDATE games SET name=?, player_count=?, url=?, price=?, cracked=?, genre=? WHERE id=?", (*values, game_id))
+        database().commit()
+        if not result.rowcount:
+            return error("That game no longer exists.", 404)
+        return jsonify(ok=True)
+
+    @app.delete("/api/admin/games/<game_id>")
+    def delete_game(game_id):
+        result = database().execute("DELETE FROM games WHERE id=?", (game_id,))
+        database().commit()
+        if not result.rowcount:
+            return error("That game no longer exists.", 404)
+        return jsonify(ok=True)
+
+    @app.post("/api/games/<game_id>/interest")
+    def game_interest(game_id):
+        own = mine()
+        if not own:
+            return error("Join the party first to choose your games.", 403)
+        data = request.get_json()
+        if not isinstance(data, dict) or any(type(data.get(key)) is not bool for key in ("owns", "wants_to_play")):
+            return error("Choose whether you own the game and want to play.")
+        if not database().execute("SELECT 1 FROM games WHERE id=?", (game_id,)).fetchone():
+            return error("That game no longer exists.", 404)
+        try:
+            if data["owns"] or data["wants_to_play"]:
+                database().execute("""INSERT INTO game_interests VALUES (?, ?, ?, ?)
+                    ON CONFLICT(game_id, player_id) DO UPDATE SET owns=excluded.owns, wants_to_play=excluded.wants_to_play""",
+                    (game_id, own["id"], data["owns"], data["wants_to_play"]))
+            else:
+                database().execute("DELETE FROM game_interests WHERE game_id=? AND player_id=?", (game_id, own["id"]))
+            database().commit()
+        except sqlite3.IntegrityError:
+            database().rollback()
+            return error("The game or player was removed. Refresh and try again.", 409)
+        return jsonify(ok=True)
 
     @app.get("/join.svg")
     def join_qr():

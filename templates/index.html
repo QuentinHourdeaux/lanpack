@@ -9,6 +9,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
+  <script src="/static/games.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -39,17 +40,32 @@
         </aside>
       </section>
 
-      <section class="directory" aria-labelledby="directory-title">
+      <div class="section-tabs" role="tablist" aria-label="Party tools">
+        <button id="players-tab" role="tab" aria-selected="true" aria-controls="players-panel">Players</button>
+        <button id="games-tab" role="tab" aria-selected="false" aria-controls="games-panel" tabindex="-1">Games <span id="game-count">0</span></button>
+      </div>
+        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
+      <section class="directory" id="players-panel" role="tabpanel" aria-labelledby="players-tab">
         <div class="directory-heading"><div class="section-title"><span class="section-marker" aria-hidden="true">01</span><h2 id="directory-title">The party</h2><span class="count-badge" id="player-count">0</span></div><span class="refresh-note" id="refresh-note">Updates every 5 seconds</span></div>
         <div class="directory-toolbar">
           <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a name, nickname or friend code…" aria-label="Search players" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
           <div class="attendance"><strong id="attendance">0 / 27</strong><span>checked in</span><progress id="progress" value="0" max="27" aria-label="Players checked in"></progress></div>
         </div>
-        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
+
         <div class="error-banner" id="load-error" role="alert" hidden></div>
         <div class="player-grid" id="players"></div>
         <div class="empty-state" id="empty-state"><span class="empty-icon" aria-hidden="true">＋</span><h3 id="empty-title">First one here?</h3><p id="empty-text">Add your details and get the party started.</p><button class="button" id="empty-join" disabled>Join the party ↗</button></div>
         <div class="directory-foot"><span><span class="dot subtle"></span> Shared with this LAN</span><span>Friend requests happen in Steam. You're in control.</span></div>
+      </section>
+      <section id="games-panel" role="tabpanel" aria-labelledby="games-tab" hidden>
+        <div class="directory-heading"><div class="section-title"><span class="section-marker">02</span><h2>What are we playing?</h2></div><button class="button small" id="add-game" hidden>Add game ＋</button></div>
+        <p class="games-intro" id="games-note">Tick what you own and what you want to play. Open a game to see who’s in.</p>
+        <label class="search game-search"><span aria-hidden="true">⌕</span><input id="game-search" type="search" aria-label="Search games" placeholder="Find a game or genre…" autocomplete="off"></label>
+        <div class="game-list" id="game-list"><table class="game-table" aria-label="Games catalog">
+          <thead><tr><th class="game-name-cell" scope="col">Game</th><th class="game-secondary" scope="col">Genre</th><th class="game-secondary game-size-cell" scope="col">Players</th><th class="game-secondary" scope="col">Price / version</th><th class="game-secondary" scope="col">Interested</th><th class="game-check-cell" scope="col">Own</th><th class="game-check-cell" scope="col">Play</th><th class="game-actions" id="game-actions-heading" scope="col" hidden>Manage</th></tr></thead>
+          <tbody id="games"></tbody>
+        </table></div>
+        <div class="empty-state" id="games-empty"><h3>No games yet.</h3><p>The organizer can add games to get things started.</p></div>
       </section>
       <aside class="steam-help"><span class="help-symbol" aria-hidden="true">i</span><p><strong>Adding a friend?</strong> Copy their code, open Steam → Friends → Add a Friend, and paste it there. Find your own code on that same page.</p></aside>
     </main>
@@ -65,6 +81,31 @@
       <div class="player-actions" hidden><button class="text-button edit-player">Edit details</button><button class="text-button danger remove-player">Remove</button></div>
     </article>
   </template>
+
+  <template id="game-template"><tr class="game-card">
+    <td class="game-name-cell"><button class="game-open"><span class="game-name"></span></button></td>
+    <td class="game-secondary game-genre"></td><td class="game-secondary game-size-cell game-player-count"></td>
+    <td class="game-secondary"><div class="game-price-version"><span class="game-price"></span><span class="small-tag game-cracked">CRACKED</span></div></td>
+    <td class="game-secondary game-totals"></td>
+    <td class="game-check-cell"><label class="game-choice"><input type="checkbox" name="owns"><span class="sr-only">I own this</span></label></td>
+    <td class="game-check-cell"><label class="game-choice"><input type="checkbox" name="wants_to_play"><span class="sr-only">I want to play</span></label></td>
+    <td class="game-actions" hidden><div><button class="text-button game-edit">Edit</button><button class="text-button danger game-remove">Remove</button></div></td>
+  </tr></template>
+
+  <dialog id="game-dialog" aria-labelledby="game-title"><form id="game-form">
+    <div class="dialog-heading"><span class="eyebrow">GAME CATALOG</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="game-title">Add a game.</h2>
+    <label>Game name<input name="name" maxlength="80" required placeholder="e.g. Trackmania"></label>
+    <label>Genre <span class="muted">(optional)</span><input name="genre" maxlength="40" placeholder="e.g. FPS, Course, Party"></label>
+    <label>Players per game <span class="muted">(optional)</span><input name="player_count" type="number" min="1" max="999" step="1" placeholder="e.g. 8"></label>
+    <label>Game URL <span class="muted">(optional)</span><input name="url" type="url" maxlength="2048" placeholder="https://…"></label>
+    <label>Price <span class="muted">(optional)</span><input name="price" maxlength="40" placeholder="e.g. Free or €19.99"></label>
+    <label class="checkbox-label"><input name="cracked" type="checkbox"> Cracked</label>
+    <p class="form-error" id="game-error" role="alert" hidden></p><button type="submit" class="button primary full">Save game ↗</button>
+  </form></dialog>
+
+  <dialog id="game-details-dialog" aria-labelledby="game-details-title"><div class="dialog-heading"><span class="eyebrow">WHO’S IN?</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="game-details-title"></h2><p class="dialog-intro" id="game-details-meta"></p><a id="game-details-link" class="button small" target="_blank" rel="noopener noreferrer" hidden>Open game URL ↗</a><ul id="game-player-list" class="game-player-list"></ul><p id="game-details-empty" class="games-intro">No selections yet. Tick a box on the game card to appear here.</p></dialog>
+
+  <dialog id="remove-game-dialog" aria-labelledby="remove-game-title"><form id="remove-game-form"><div class="dialog-heading"><span class="eyebrow">GAME CATALOG</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="remove-game-title">Remove game?</h2><p id="remove-game-description" class="dialog-intro"></p><p class="form-error" id="remove-game-error" role="alert" hidden></p><button type="submit" class="button destructive full">Remove game</button></form></dialog>
 
   <dialog id="player-dialog" aria-labelledby="player-dialog-title">
     <form id="player-form"><div class="dialog-heading"><span class="eyebrow">MAKE YOURSELF AT HOME</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="player-dialog-title">Join the party.</h2><p class="dialog-intro">A few details so everyone can find you.</p>
