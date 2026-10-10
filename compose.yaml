@@ -7,7 +7,7 @@ services:
       LANPACK_SECRET_KEY: ${LANPACK_SECRET_KEY:?Run ./lanpack setup first}
       LANPACK_ADMIN_PASSWORD: ${LANPACK_ADMIN_PASSWORD:-admin}
       LANPACK_PUBLIC_URL: ${LANPACK_PUBLIC_URL:-http://127.0.0.1:8080}
-      LANPACK_EXPECTED_PLAYERS: ${LANPACK_EXPECTED_PLAYERS:-27}
+      LANPACK_EXPECTED_PLAYERS: ${LANPACK_EXPECTED_PLAYERS:-25}
       LANPACK_DB: /app/data/lanpack.sqlite
     volumes:
       - lanpack-data:/app/data

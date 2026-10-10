@@ -46,12 +46,12 @@
         <button id="games-tab" role="tab" aria-selected="false" aria-controls="games-panel" tabindex="-1">Games <span id="game-count">0</span></button>
         <button id="teams-tab" role="tab" aria-selected="false" aria-controls="teams-panel" tabindex="-1">Teams</button>
       </div>
-        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
+        <div class="admin-toolbar" id="admin-toolbar" hidden><span>Organizer mode <span class="muted">· Edit or remove any player</span></span><div><button class="button small" id="event-settings">Expected headcount</button><button class="button small" id="change-password">Change password</button><a class="button small" href="/api/admin/export">Export directory ↓</a><button class="button small" id="logout">Sign out</button></div></div>
       <section class="directory" id="players-panel" role="tabpanel" aria-labelledby="players-tab">
         <div class="directory-heading"><div class="section-title"><span class="section-marker" aria-hidden="true">01</span><h2 id="directory-title">The party</h2><span class="count-badge" id="player-count">0</span></div><span class="refresh-note" id="refresh-note">Updates every 5 seconds</span></div>
         <div class="directory-toolbar">
           <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a name, nickname or friend code…" aria-label="Search players" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
-          <div class="attendance"><strong id="attendance">0 / 27</strong><span>checked in</span><progress id="progress" value="0" max="27" aria-label="Players checked in"></progress></div>
+          <div class="attendance"><strong id="attendance">0 checked in · 25 expected</strong><progress id="progress" value="0" max="25" aria-label="Players checked in"></progress></div>
         </div>
 
         <div class="error-banner" id="load-error" role="alert" hidden></div>
@@ -147,6 +147,13 @@
   </dialog>
 
   <dialog id="admin-dialog" aria-labelledby="admin-title"><form id="admin-form"><div class="dialog-heading"><span class="eyebrow">HOST CONTROLS</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div><h2 id="admin-title">Organizer access.</h2><p class="dialog-intro">Correct player details, remove entries and export the directory.</p><label>Organizer password<input name="password" type="password" required autocomplete="current-password"></label><p class="form-error" id="admin-error" role="alert" hidden></p><button class="button primary full" type="submit">Unlock controls ↗</button></form></dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form">
+    <div class="dialog-heading"><span class="eyebrow">PARTY SETTINGS</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
+    <h2 id="settings-title">Expected headcount.</h2><p class="dialog-intro">Your best guess for attendance. Everyone can still join if more people show up.</p>
+    <label>Expected players<input name="expected_players" type="number" min="1" max="999" step="1" required></label>
+    <p class="form-error" id="settings-error" role="alert" hidden></p><button class="button primary full" type="submit">Save headcount ↗</button>
+  </form></dialog>
 
   <dialog id="password-dialog" aria-labelledby="password-title"><form id="password-form">
     <div class="dialog-heading"><span class="eyebrow">ORGANIZER SECURITY</span><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
